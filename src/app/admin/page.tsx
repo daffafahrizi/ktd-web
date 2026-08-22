@@ -34,6 +34,7 @@ import { usePortfolio } from "@/context/PortfolioContext";
 import { PortfolioItem, PortfolioCategory } from "@/data/initialData";
 import { InstagramIcon } from "@/components/Icons";
 import ThemeToggle from "@/components/ThemeToggle";
+import Logo from "@/components/Logo";
 import { isSupabaseConfigured, uploadImageToSupabase } from "@/lib/supabase";
 
 const CATEGORY_OPTIONS: { value: PortfolioCategory; label: string }[] = [
@@ -325,21 +326,8 @@ export default function AdminPage() {
           <div className="absolute top-0 left-0 right-0 h-2.5 bg-gradient-to-r from-[#FF6000] via-orange-400 to-[#0F2744]" />
 
           {/* Logo Badge */}
-          <div className="inline-flex items-center justify-center gap-2 mb-6">
-            <span className="bg-[#FF6000] text-white font-extrabold text-2xl px-3 py-1 rounded-xl shadow-md">
-              K
-            </span>
-            <span className="text-[#0F2744] dark:text-white font-black text-2xl tracking-tight">
-              TD
-            </span>
-            <div className="border-l border-slate-200 dark:border-slate-700 pl-2.5 text-left">
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 tracking-wider uppercase block">
-                Kemasan323
-              </span>
-              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
-                Admin Console
-              </span>
-            </div>
+          <div className="mb-6 flex justify-center">
+            <Logo size="lg" />
           </div>
 
           <h1 className="text-xl sm:text-2xl font-extrabold text-[#0F2744] dark:text-white mb-2">
@@ -404,22 +392,9 @@ export default function AdminPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           {/* Logo & Brand */}
           <div className="flex items-center gap-3">
-            <Link href="/admin" className="flex items-center gap-2">
-              <span className="bg-[#FF6000] text-white font-extrabold text-xl px-2.5 py-0.5 rounded-lg shadow-sm">
-                K
-              </span>
-              <span className="text-white font-black text-xl tracking-tight">
-                TD
-              </span>
+            <Link href="/admin">
+              <Logo size="sm" variant="admin" />
             </Link>
-            <div className="hidden sm:block border-l border-slate-700 pl-3">
-              <span className="text-xs font-bold text-orange-400 tracking-wide uppercase block">
-                Admin Panel
-              </span>
-              <span className="text-[10px] text-slate-300 font-medium leading-none">
-                Kemasan323 (KTD)
-              </span>
-            </div>
           </div>
 
           {/* Quick Info & Actions */}

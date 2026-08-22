@@ -42,6 +42,18 @@ export const metadata: Metadata = {
     siteName: "Kemasan323 (KTD)",
     locale: "id_ID",
     type: "website",
+    images: [
+      {
+        url: "/images/logo.jpg",
+        width: 500,
+        height: 500,
+        alt: "Logo KTD Kemasan323",
+      },
+    ],
+  },
+  icons: {
+    icon: "/images/logo.jpg",
+    apple: "/images/logo.jpg",
   },
 };
 

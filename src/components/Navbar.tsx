@@ -5,6 +5,7 @@ import Link from "next/link";
 import { MessageCircle, Menu, X, Sparkles, ShieldCheck } from "lucide-react";
 import { InstagramIcon } from "./Icons";
 import ThemeToggle from "./ThemeToggle";
+import Logo from "./Logo";
 import { usePortfolio } from "@/context/PortfolioContext";
 
 export default function Navbar() {
@@ -32,21 +33,8 @@ export default function Navbar() {
     >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between">
         {/* Logo KTD */}
-        <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="flex items-center tracking-tight font-extrabold text-2xl">
-            <span className="bg-[#FF6000] text-white px-2.5 py-1 rounded-xl shadow-sm group-hover:scale-105 transition-transform">
-              K
-            </span>
-            <span className="text-[#0F2744] dark:text-white ml-1.5 font-black">TD</span>
-          </div>
-          <div className="hidden sm:flex flex-col border-l border-slate-200 dark:border-slate-700 pl-2.5 text-left">
-            <span className="text-xs font-bold text-slate-800 dark:text-slate-200 tracking-wider uppercase">
-              Kemasan323
-            </span>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium leading-none">
-              Custom Box Packaging
-            </span>
-          </div>
+        <Link href="/" className="flex items-center">
+          <Logo size="md" />
         </Link>
 
         {/* Live Status Badge (Desktop) */}

@@ -9,6 +9,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { InstagramIcon } from "./Icons";
+import Logo from "./Logo";
 import { usePortfolio } from "@/context/PortfolioContext";
 
 export default function FooterSection() {
@@ -23,21 +24,8 @@ export default function FooterSection() {
           {/* Brand Info (5 cols) */}
           <div className="lg:col-span-5">
             {/* Logo KTD */}
-            <div className="flex items-center gap-2.5 mb-4">
-              <span className="bg-[#FF6000] text-white font-extrabold text-2xl px-3 py-1 rounded-xl shadow-md">
-                K
-              </span>
-              <span className="text-white font-black text-2xl tracking-tight">
-                TD
-              </span>
-              <div className="border-l border-slate-700 pl-3">
-                <span className="text-sm font-bold text-slate-200 tracking-wider uppercase block">
-                  Kemasan323
-                </span>
-                <span className="text-[10px] text-slate-400 font-medium">
-                  More Than Brown Boxes 📦
-                </span>
-              </div>
+            <div className="mb-4">
+              <Logo variant="footer" size="lg" />
             </div>
 
             <p className="text-slate-300 dark:text-slate-400 text-xs sm:text-sm leading-relaxed mb-6 max-w-sm">

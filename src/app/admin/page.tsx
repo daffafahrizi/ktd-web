@@ -34,6 +34,7 @@ import { usePortfolio } from "@/context/PortfolioContext";
 import { PortfolioItem, PortfolioCategory } from "@/data/initialData";
 import { InstagramIcon } from "@/components/Icons";
 import ThemeToggle from "@/components/ThemeToggle";
+import { isSupabaseConfigured, uploadImageToSupabase } from "@/lib/supabase";
 
 const CATEGORY_OPTIONS: { value: PortfolioCategory; label: string }[] = [
   { value: "fashion", label: "👗 Fashion & Hijab" },
@@ -75,11 +76,13 @@ export default function AdminPage() {
   const {
     portfolio,
     settings,
+    isSupabaseConnected,
     addPortfolioItem,
     updatePortfolioItem,
     deletePortfolioItem,
     updateSettings,
     resetToDefaults,
+    refreshFromCloud,
   } = usePortfolio();
 
   // Auth State
@@ -88,7 +91,7 @@ export default function AdminPage() {
   const [authError, setAuthError] = useState("");
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<"catalog" | "settings" | "guide">("catalog");
+  const [activeTab, setActiveTab] = useState<"catalog" | "settings" | "database" | "guide">("catalog");
 
   // Search & Filter in Catalog
   const [searchQuery, setSearchQuery] = useState("");
@@ -174,13 +177,56 @@ export default function AdminPage() {
     setIsModalOpen(true);
   };
 
-  // Handle File Upload
+  // Helper for compressing image to base64 WebP
+  const compressImageToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (readerEvent) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL("image/webp", 0.82);
+            resolve(dataUrl);
+          } else {
+            resolve(readerEvent.target?.result as string);
+          }
+        };
+        img.onerror = () => reject(new Error("Gagal memproses file gambar"));
+        img.src = readerEvent.target?.result as string;
+      };
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Handle File Upload: Uploads to Supabase Storage if configured, or falls back to WebP
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      setUploadError("Ukuran file maksimal 5MB");
+    if (file.size > 15 * 1024 * 1024) {
+      setUploadError("Ukuran file maksimal 15MB");
       return;
     }
 
@@ -188,22 +234,23 @@ export default function AdminPage() {
     setUploadError("");
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await res.json();
-      if (res.ok && data.url) {
-        setFormImageSrc(data.url);
-      } else {
-        setUploadError(data.error || "Gagal mengunggah gambar");
+      // 1. Jika Supabase terhubung, upload langsung ke Cloud Storage
+      if (isSupabaseConfigured) {
+        const { url, error } = await uploadImageToSupabase(file);
+        if (url) {
+          setFormImageSrc(url);
+          setIsUploading(false);
+          return;
+        } else {
+          console.warn("Supabase upload error, falling back to local WebP:", error);
+        }
       }
+
+      // 2. Fallback kompresi lokal WebP
+      const base64Url = await compressImageToBase64(file);
+      setFormImageSrc(base64Url);
     } catch (err: any) {
-      setUploadError("Terjadi kesalahan saat upload gambar: " + err.message);
+      setUploadError("Gagal memproses gambar: " + err.message);
     } finally {
       setIsUploading(false);
     }
@@ -502,6 +549,27 @@ export default function AdminPage() {
           >
             <Settings className="w-4 h-4" />
             <span>Pengaturan WhatsApp & Toko</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("database")}
+            className={`pb-3 px-4 font-bold text-sm border-b-2 flex items-center gap-2 whitespace-nowrap transition-colors ${
+              activeTab === "database"
+                ? "border-[#FF6000] text-[#FF6000]"
+                : "border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white"
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            <span>Database Cloud (Supabase)</span>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full font-extrabold ${
+                isSupabaseConnected
+                  ? "bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300"
+                  : "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300"
+              }`}
+            >
+              {isSupabaseConnected ? "Terhubung" : "Setup"}
+            </span>
           </button>
 
           <button
@@ -864,7 +932,111 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* --- TAB 3: ADMIN GUIDE --- */}
+        {/* --- TAB 3: SUPABASE DATABASE CLOUD --- */}
+        {activeTab === "database" && (
+          <div className="max-w-3xl bg-white dark:bg-[#162038] rounded-3xl p-6 sm:p-10 border border-slate-200/90 dark:border-slate-700/60 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100 dark:border-slate-700/60">
+              <div>
+                <h3 className="text-xl font-extrabold text-[#0F2744] dark:text-white flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-[#FF6000]" />
+                  <span>Koneksi Supabase Cloud Database & Storage</span>
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Hubungkan database PostgreSQL dan Cloud Storage Supabase gratis agar semua pengunjung web melihat update katalog secara live.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  refreshFromCloud();
+                  alert("Mencoba sinkronisasi ulang data dari Supabase...");
+                }}
+                className="inline-flex items-center gap-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold px-4 py-2.5 rounded-xl transition-colors self-start sm:self-auto flex-shrink-0"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Test Koneksi Cloud</span>
+              </button>
+            </div>
+
+            {/* Connection Status Banner */}
+            <div
+              className={`p-5 rounded-2xl border flex items-center justify-between gap-4 ${
+                isSupabaseConnected
+                  ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300"
+                  : "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span
+                  className={`w-3.5 h-3.5 rounded-full flex-shrink-0 ${
+                    isSupabaseConnected ? "bg-emerald-500 animate-ping" : "bg-amber-500"
+                  }`}
+                />
+                <div>
+                  <h4 className="font-bold text-sm">
+                    {isSupabaseConnected
+                      ? "Supabase Cloud Aktif & Terhubung!"
+                      : "Mode Penyimpanan Lokal (Belum Terkoneksi Supabase)"}
+                  </h4>
+                  <p className="text-xs opacity-90 mt-0.5">
+                    {isSupabaseConnected
+                      ? "Produk dan foto yang Anda upload tersimpan permanen di cloud CDN dan langsung tampil ke seluruh dunia."
+                      : "Data saat ini tersimpan di browser ini. Ikuti 3 langkah di bawah untuk menghubungkan Supabase gratis."}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 3 Step Wizard */}
+            <div className="space-y-4 pt-2">
+              {/* Step 1 */}
+              <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-sm text-[#0F2744] dark:text-white">
+                  <span className="w-6 h-6 rounded-full bg-[#FF6000] text-white text-xs flex items-center justify-center font-bold">
+                    1
+                  </span>
+                  <span>Buat Proyek Gratis di Supabase</span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 pl-8 leading-relaxed">
+                  Buka <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-[#FF6000] font-bold underline">supabase.com</a>, daftar/login gratis, lalu buat proyek baru (contoh nama: <code>kemasan323-db</code>).
+                </p>
+              </div>
+
+              {/* Step 2 */}
+              <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-sm text-[#0F2744] dark:text-white">
+                  <span className="w-6 h-6 rounded-full bg-[#FF6000] text-white text-xs flex items-center justify-center font-bold">
+                    2
+                  </span>
+                  <span>Jalankan Script SQL di SQL Editor Supabase</span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 pl-8 leading-relaxed">
+                  Buka menu <strong>SQL Editor</strong> di dashboard Supabase Anda, buat query baru, lalu jalankan query dari file <code>supabase_schema.sql</code> yang sudah kami sediakan di proyek ini.
+                </p>
+              </div>
+
+              {/* Step 3 */}
+              <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 space-y-2">
+                <div className="flex items-center gap-2 font-bold text-sm text-[#0F2744] dark:text-white">
+                  <span className="w-6 h-6 rounded-full bg-[#FF6000] text-white text-xs flex items-center justify-center font-bold">
+                    3
+                  </span>
+                  <span>Masukkan API Keys ke Vercel / .env.local</span>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300 pl-8 leading-relaxed">
+                  Buka <strong>Project Settings → API</strong> di Supabase. Salin URL dan anon public key ke <strong>Environment Variables di Vercel</strong>:
+                </p>
+                <div className="bg-slate-900 text-slate-100 p-3.5 rounded-xl text-xs font-mono pl-8 space-y-1 overflow-x-auto">
+                  <div>NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co</div>
+                  <div>NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOi...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- TAB 4: ADMIN GUIDE --- */}
         {activeTab === "guide" && (
           <div className="max-w-3xl bg-white dark:bg-[#162038] rounded-3xl p-6 sm:p-10 border border-slate-200/90 dark:border-slate-700/60 shadow-sm space-y-6">
             <div>
